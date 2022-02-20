@@ -1,9 +1,18 @@
 # sshPrivateKeyCrack
 Get passphrase from ssh private key using a wordlist
-
-# Usage
+## Preperation/Installation
 ```
 git clone https://github.com/K1llf0rce/sshPrivateKeyCrack.git
 cd sshPrivateKeyCrack
 python3 sshCrack.py
+```
+or
+```
+git clone https://github.com/K1llf0rce/sshPrivateKeyCrack.git
+chmod +x sshCrack.py
+./sshCrack.py
+```
+## Usage
+```
+sshCrack.py [-h] -f FILE -w WORDLIST
 ```
