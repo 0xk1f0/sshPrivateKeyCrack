@@ -8,5 +8,5 @@ chmod +x sshCrack.py
 ```
 ## Usage
 ```
-sshCrack.py [-h] -f FILE -w WORDLIST
+./sshCrack.py [-h] -f FILE -w WORDLIST
 ```
