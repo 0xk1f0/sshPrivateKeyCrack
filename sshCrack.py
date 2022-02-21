@@ -13,8 +13,8 @@ parser.add_argument("-f", "--file", help = "Specify the absolute path to the SSH
 parser.add_argument("-w", "--wordlist", help = "Specify the absolute path to your Wordlist", required=True)
 args = parser.parse_args()
 
-# cmd execute function
-def cmdline(word):
+# decrypt function
+def exec_decrypt(word):
     process = Popen(["ssh-keygen", "-f", str(args.file), "-m", "pem", "-p", "-P", word], stdout=DEVNULL, stderr=PIPE, stdin=DEVNULL,)
     (out, err) = process.communicate()
     return err
@@ -24,7 +24,7 @@ def main():
     words = open(str())
     count=0
     for w in words:
-        res = cmdline(w.strip(args.wordlist))
+        res = exec_decrypt(w.strip(args.wordlist))
         if not str(res).startswith("b'Failed"):
                 print("\nThe key is: "+w.strip())
                 sys.exit()
@@ -32,6 +32,7 @@ def main():
         count=count+1
 
 # start here
-print("MAKE SURE THE PRIVATE-KEY FILE HAS 'chmod 600' PERMISSIONS!")
-sleep(2)
-main()
+if __name__ == "__main__":
+    print("MAKE SURE THE PRIVATE-KEY FILE HAS 'chmod 600' PERMISSIONS!")
+    sleep(2)
+    main()
