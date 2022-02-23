@@ -21,10 +21,10 @@ def exec_decrypt(word):
 
 # main function
 def main():
-    words = open(str())
+    words = open(str(args.wordlist))
     count=0
     for w in words:
-        res = exec_decrypt(w.strip(args.wordlist))
+        res = exec_decrypt(w.strip())
         if not str(res).startswith("b'Failed"):
                 print("\nThe key is: "+w.strip())
                 sys.exit()
