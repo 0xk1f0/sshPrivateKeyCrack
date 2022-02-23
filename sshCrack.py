@@ -9,9 +9,22 @@ import argparse
 
 # init option parser
 parser = argparse.ArgumentParser(description="SSH Private-Key Passphrase Cracker")
-parser.add_argument("-f", "--file", help = "Specify the absolute path to the SSH Private-Key file", required=True)
-parser.add_argument("-w", "--wordlist", help = "Specify the absolute path to your Wordlist", required=True)
+parser.add_argument("-f", "--file", help = "Specify the path to the SSH Private-Key file", required=True)
+parser.add_argument("-w", "--wordlist", help = "Specify the path to your Wordlist", required=True)
 args = parser.parse_args()
+
+# permission checker
+def set_perm(filepath):
+    process = Popen(["chmod", "600", filepath], stdout=DEVNULL, stderr=PIPE, stdin=DEVNULL)
+    (out, err) = process.communicate()
+    if str(err) == "b''":
+        print("Automatically changed keyfile permissions!")
+        print("Starting...")
+        sleep(2)
+    else:
+        print("WARNING: Keyfile permissions could not be set/verified!")
+        print("Always make sure the Keyfile has 'chmod 600' permissions!")
+        sleep(2)
 
 # decrypt function
 def exec_decrypt(word):
@@ -23,16 +36,18 @@ def exec_decrypt(word):
 def main():
     words = open(str(args.wordlist))
     count=0
+    set_perm(args.file)
     for w in words:
         res = exec_decrypt(w.strip())
         if not str(res).startswith("b'Failed"):
-                print("\nThe key is: "+w.strip())
+                print(">"+str(count)+"/"+str(w.strip()+"<"))
+                print("\nCRACKED:")
+                print(str(args.file)+":"+w.strip())
+                Popen(["mv", str(args.file), str(args.file)+".cracked"], stdout=DEVNULL, stderr=DEVNULL, stdin=DEVNULL,)
                 sys.exit()
         print(str(count)+"/"+str(w.strip()))
         count=count+1
 
 # start here
 if __name__ == "__main__":
-    print("MAKE SURE THE PRIVATE-KEY FILE HAS 'chmod 600' PERMISSIONS!")
-    sleep(2)
     main()
