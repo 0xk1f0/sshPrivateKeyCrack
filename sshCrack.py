@@ -4,6 +4,7 @@
 
 from subprocess import Popen, PIPE, DEVNULL
 import sys
+import os
 import multiprocessing as mp
 from time import sleep
 import argparse
@@ -13,6 +14,7 @@ parser = argparse.ArgumentParser(description="SSH Private-Key Passphrase Cracker
 parser.add_argument("-f", "--file", help = "Specify the path to the SSH Private-Key file", required=True)
 parser.add_argument("-w", "--wordlist", help = "Specify the path to your Wordlist", required=True)
 args = parser.parse_args()
+cpuCount = int(os.cpu_count())
 
 # permission checker
 def set_perm(filepath):
@@ -20,7 +22,7 @@ def set_perm(filepath):
     (out, err) = process.communicate()
     if str(err) == "b''":
         print("Automatically changed keyfile permissions!")
-        print("Starting...")
+        print(f"Starting with {cpuCount} processes...")
     else:
         print("WARNING: Keyfile permissions could not be set/verified!")
         print("Always make sure the Keyfile has 'chmod 600' permissions!")
@@ -41,17 +43,27 @@ def exec_decrypt(word):
     return err
 
 # process function
-def process_handler(word):
+def process_handler(word,done):
     while int(word.value) < int(wordlist_length):
-        res = exec_decrypt(str(wordlist_lines[word.value].decode("utf-8")).strip())
+        targetWord = str(wordlist_lines[word.value].decode("utf-8")).strip()
+        res = exec_decrypt(targetWord)
         if not str(res).startswith("b'Failed"):
-                print(">"+str(word.value)+"/"+str(wordlist_lines[word.value].decode("utf-8"))+"<")
-                print("\nCRACKED:")
-                print(str(args.file)+":"+str(wordlist_lines[word.value].decode("utf-8")))
-                Popen(["mv", str(args.file), str(args.file)+".cracked"], stdout=DEVNULL, stderr=DEVNULL, stdin=DEVNULL,)
-                sys.exit()
-        print(str(word.value)+"/"+str(wordlist_lines[word.value].decode("utf-8")))
+            if done.value == "":
+                done.value = targetWord
+                end_all(done.value)
+            else:
+                return False
+        print("X "+targetWord+" X")
         word.value += 1
+
+# finisher function
+def end_all(passwd):
+    print("> "+passwd+" <")
+    sleep(2)
+    print("\nCRACKED:")
+    print(str(args.file)+":"+passwd)
+    Popen(["mv", str(args.file), str(args.file)+".cracked"], stdout=DEVNULL, stderr=DEVNULL, stdin=DEVNULL,)
+    sys.exit()
 
 # main function
 def main():
@@ -60,13 +72,15 @@ def main():
     set_perm(args.file)
     sleep(2)
     manager = mp.Manager()
+    crackDone = manager.Value('s', "")
     cnt = manager.Value('i', 0)
-    p1 = mp.Process(target=process_handler, args=(cnt,))
-    p1.start()
-    p2 = mp.Process(target=process_handler, args=(cnt,))
-    p2.start()
-    p1.join()
-    p2.join()
+    prcs = []
+    for i in range(1,cpuCount):
+        p = mp.Process(target=process_handler, args=(cnt,crackDone,))
+        prcs.append(p)
+        p.start()
+    for i in prcs:
+        i.join()
 
 # start here
 if __name__ == "__main__":
