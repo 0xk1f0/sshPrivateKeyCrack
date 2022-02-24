@@ -4,6 +4,7 @@
 
 from subprocess import Popen, PIPE, DEVNULL
 import sys
+import multiprocessing as mp
 from time import sleep
 import argparse
 
@@ -20,11 +21,18 @@ def set_perm(filepath):
     if str(err) == "b''":
         print("Automatically changed keyfile permissions!")
         print("Starting...")
-        sleep(2)
     else:
         print("WARNING: Keyfile permissions could not be set/verified!")
         print("Always make sure the Keyfile has 'chmod 600' permissions!")
-        sleep(2)
+
+# wordlist handling
+def load_wordlist():
+    global wordlist_lines
+    global wordlist_length
+    wordlist = open(str(args.wordlist), 'rb')
+    wordlist_lines = wordlist.readlines()
+    wordlist_length = len(wordlist_lines)
+    print(f"Loaded wordlist '{args.wordlist}', {wordlist_length} lines!")
 
 # decrypt function
 def exec_decrypt(word):
@@ -32,21 +40,33 @@ def exec_decrypt(word):
     (out, err) = process.communicate()
     return err
 
-# main function
-def main():
-    words = open(str(args.wordlist))
-    count=0
-    set_perm(args.file)
-    for w in words:
-        res = exec_decrypt(w.strip())
+# process function
+def process_handler(word):
+    while int(word.value) < int(wordlist_length):
+        res = exec_decrypt(str(wordlist_lines[word.value].decode("utf-8")).strip())
         if not str(res).startswith("b'Failed"):
-                print(">"+str(count)+"/"+str(w.strip()+"<"))
+                print(">"+str(word.value)+"/"+str(wordlist_lines[word.value].decode("utf-8"))+"<")
                 print("\nCRACKED:")
-                print(str(args.file)+":"+w.strip())
+                print(str(args.file)+":"+str(wordlist_lines[word.value].decode("utf-8")))
                 Popen(["mv", str(args.file), str(args.file)+".cracked"], stdout=DEVNULL, stderr=DEVNULL, stdin=DEVNULL,)
                 sys.exit()
-        print(str(count)+"/"+str(w.strip()))
-        count=count+1
+        print(str(word.value)+"/"+str(wordlist_lines[word.value].decode("utf-8")))
+        word.value += 1
+
+# main function
+def main():
+    load_wordlist()
+    sleep(2)
+    set_perm(args.file)
+    sleep(2)
+    manager = mp.Manager()
+    cnt = manager.Value('i', 0)
+    p1 = mp.Process(target=process_handler, args=(cnt,))
+    p1.start()
+    p2 = mp.Process(target=process_handler, args=(cnt,))
+    p2.start()
+    p1.join()
+    p2.join()
 
 # start here
 if __name__ == "__main__":
