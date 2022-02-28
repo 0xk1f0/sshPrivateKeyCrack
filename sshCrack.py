@@ -1,22 +1,32 @@
 #!/usr/bin/python3
-# Try to export public key from private key, which requires passphrase
-# Cycle through wordlist until correct password is found
+# How this script operates:
+# 
+# Currently, this script requires openssh to be installed.
+# Using ssh-keygen, we try to extract the public-key from the private-key file 
+# in ".pem" format, which requires the passphrase of the given key.
+# Using the provided wordlist, we basically try out every password in it,
+# until we do not get a failed attempt warning.
+# We then mark the key with the file ending ".cracked".
+# If we use the ssh-keygen conversion command again on a ".cracked" file,
+# we are able to directly set our new passphrase.
+#
+# ssh-keygen will only accept the given key file, if permissions are
+# correctly set. That's why the script also tries to "chmod 600" the file
+# before proceeding with the cracking process.
 
 from subprocess import Popen, PIPE, DEVNULL
-import sys
-import os
-import multiprocessing as mp
+from sys import exit as sysexit
+from os import cpu_count
+from multiprocessing import Process, Manager
 from time import sleep
-import argparse
+from argparse import ArgumentParser
 
-# init option parser
-parser = argparse.ArgumentParser(description="SSH Private-Key Passphrase Cracker")
+parser = ArgumentParser(description="SSH Private-Key Passphrase Cracker")
 parser.add_argument("-f", "--file", help = "Specify the path to the SSH Private-Key file", required=True)
 parser.add_argument("-w", "--wordlist", help = "Specify the path to your Wordlist", required=True)
 args = parser.parse_args()
-cpuCount = int(os.cpu_count())
+cpuCount = int(cpu_count())
 
-# permission checker
 def set_perm(filepath):
     process = Popen(["chmod", "600", filepath], stdout=DEVNULL, stderr=PIPE, stdin=DEVNULL)
     (out, err) = process.communicate()
@@ -27,7 +37,11 @@ def set_perm(filepath):
         print("WARNING: Keyfile permissions could not be set/verified!")
         print("Always make sure the Keyfile has 'chmod 600' permissions!")
 
-# wordlist handling
+def exec_attempt(word):
+    process = Popen(["ssh-keygen", "-f", str(args.file), "-m", "pem", "-p", "-P", word], stdout=DEVNULL, stderr=PIPE, stdin=DEVNULL,)
+    (out, err) = process.communicate()
+    return err
+
 def load_wordlist():
     global wordlist_lines
     global wordlist_length
@@ -36,18 +50,11 @@ def load_wordlist():
     wordlist_length = len(wordlist_lines)
     print(f"Loaded wordlist '{args.wordlist}', {wordlist_length} lines!")
 
-# decrypt function
-def exec_decrypt(word):
-    process = Popen(["ssh-keygen", "-f", str(args.file), "-m", "pem", "-p", "-P", word], stdout=DEVNULL, stderr=PIPE, stdin=DEVNULL,)
-    (out, err) = process.communicate()
-    return err
-
-# process function
 def process_handler(word,done):
     while int(word.value) < int(wordlist_length):
         targetWord = str(wordlist_lines[word.value].decode("utf-8")).strip()
-        res = exec_decrypt(targetWord)
-        if not str(res).startswith("b'Failed"):
+        res = exec_attempt(targetWord)
+        if not res.decode("utf-8").startswith("Failed"):
             if done.value == "":
                 done.value = targetWord
                 end_all(done.value)
@@ -56,32 +63,28 @@ def process_handler(word,done):
         print("X "+targetWord+" X")
         word.value += 1
 
-# finisher function
 def end_all(passwd):
-    print("> "+passwd+" <")
+    print("✓ "+passwd+" ✓")
     sleep(2)
     print("\nCRACKED:")
     print(str(args.file)+":"+passwd)
     Popen(["mv", str(args.file), str(args.file)+".cracked"], stdout=DEVNULL, stderr=DEVNULL, stdin=DEVNULL,)
-    sys.exit()
+    sysexit()
 
-# main function
 def main():
     load_wordlist()
     sleep(2)
     set_perm(args.file)
     sleep(2)
-    manager = mp.Manager()
-    crackDone = manager.Value('s', "")
-    cnt = manager.Value('i', 0)
+    crackDone = Manager().Value('s', "")
+    cnt = Manager().Value('i', 0)
     prcs = []
     for i in range(1,cpuCount):
-        p = mp.Process(target=process_handler, args=(cnt,crackDone,))
-        prcs.append(p)
+        p = Process(target=process_handler, args=(cnt,crackDone,))
         p.start()
+        prcs.append(p)
     for i in prcs:
         i.join()
 
-# start here
 if __name__ == "__main__":
     main()
